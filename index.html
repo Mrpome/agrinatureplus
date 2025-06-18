@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <link rel="manifest" href="manifest.json">
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js');
+    }
+  </script>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agri Nature Plus - Boutique</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f7f9f5; color: #333; }
+    header { background: #4CAF50; color: white; padding: 1em; text-align: center; }
+    h1 { margin: 0.2em 0; }
+    .products, .cart { display: flex; flex-wrap: wrap; justify-content: center; margin: 1em; }
+    .product, .cart-item { border: 2px solid #4CAF50; border-radius: 10px; margin: 1em; padding: 1em; width: 250px; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    .product img { width: 100%; height: 150px; object-fit: cover; border-radius: 8px; }
+    button { background: #4CAF50; color: white; border: none; padding: 0.5em 1em; cursor: pointer; border-radius: 5px; }
+    .total { font-weight: bold; font-size: 1.2em; text-align: center; margin-top: 1em; }
+    .payment, .client-info { margin: 1em auto; max-width: 400px; padding: 1em; background: white; border: 2px solid #4CAF50; border-radius: 10px; }
+    input, textarea { width: 100%; padding: 0.5em; margin-top: 0.5em; border-radius: 5px; border: 1px solid #ccc; }
+    .qr { text-align: center; }
+    footer { text-align: center; margin: 2em 0; font-size: 0.9em; color: #777; }
+    .whatsapp-button {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background-color: #25D366;
+      color: white;
+      border-radius: 50px;
+      padding: 12px 20px;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      z-index: 999;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Agri Nature Plus</h1>
+    <p>Produits 100% naturels – Commandez et payez en toute sécurité</p>
+  </header>
+
+  <section class="products" id="productList"></section>
+
+  <section class="cart">
+    <div class="cart-item" id="cart">
+      <h2>Panier</h2>
+      <ul id="cartItems"></ul>
+      <div class="total">
+        Total : <span id="totalPrice">0</span> FCFA | <span id="totalPi">0</span> π
+      </div>
+    </div>
+  </section>
+
+  <section class="client-info">
+    <h3>Informations Client</h3>
+    <input type="text" id="clientName" placeholder="Nom complet" required>
+    <input type="text" id="clientPhone" placeholder="Téléphone WhatsApp" required>
+    <textarea id="clientAddress" placeholder="Adresse complète"></textarea>
+  </section>
+
+  <section class="payment">
+    <h3>Paiement</h3>
+    <p><strong>Mobile Money via FedaPay</strong></p>
+    <button onclick="payWithFedaPay()">Payer avec FedaPay</button><hr>
+
+    <p><strong>Paiement via Pi Coin</strong></p>
+    <div class="qr">
+      <img src="https://api.qrserver.com/v1/create-qr-code/?data=GA34QTXX7K6Q2GEHKLTSO46MD7D3APZWFB4M3N73W2ZD4TXHOSCS7T76&size=200x200" alt="QR Code Pi">
+      <p>Adresse Pi Coin :
+        <input type="text" id="piAddress" value="GA34QTXX7K6Q2GEHKLTSO46MD7D3APZWFB4M3N73W2ZD4TXHOSCS7T76" readonly onclick="this.select()">
+        <button onclick="copyPiAddress()">Copier</button>
+      </p>
+    </div>
+  </section>
+
+  <a class="whatsapp-button" href="https://wa.me/2290194999521" target="_blank">
+    <i class="fab fa-whatsapp"></i> Chat
+  </a>
+
+  <footer>
+    <p>Contact WhatsApp : <a href="https://wa.me/2290194999521" target="_blank">+2290194999521</a><br>
+    Email : agrinatureplus.info@gmail.com</p>
+  </footer>
+
+  <script src="https://cdn.fedapay.com/checkout.js"></script>
+  <script>
+    const products = [
+      "Chips de patates douces", "Chips de banane plantain", "Chips de taro", "Chips de soja",
+      "Cacahouètes de soja", "Chips de pomme de terre", "Chips de manioc", "Huile de baobab",
+      "Biscuit de baobab", "Croustilles de gingembre", "Thé de menthe nature", "Chips de fonio", "Farine enrichie"
+    ];
+    const prices = [2000, 1000, 2500, 500, 1000, 2000, 500, 2500, 600, 700, 800, 500, 2500];
+    const productList = document.getElementById("productList");
+    const cartItems = document.getElementById("cartItems");
+    const totalPriceEl = document.getElementById("totalPrice");
+    const totalPiEl = document.getElementById("totalPi");
+
+    let cart = [];
+
+    products.forEach((name, index) => {
+      const product = document.createElement("div");
+      product.className = "product";
+      product.innerHTML = `
+        <img src="https://via.placeholder.com/250x150?text=${encodeURIComponent(name)}" alt="${name}">
+        <h4>${name}</h4>
+        <p>${prices[index]} FCFA | ${(prices[index] / 100000000).toFixed(8)} π</p>
+        <input type="number" id="qty-${index}" min="1" value="1" style="width:60px">
+        <button onclick="addToCart(${index})">Ajouter</button>
+      `;
+      productList.appendChild(product);
+    });
+
+    function addToCart(index) {
+      const qty = parseInt(document.getElementById("qty-" + index).value) || 1;
+      for (let i = 0; i < qty; i++) cart.push(index);
+      renderCart();
+    }
+
+    function renderCart() {
+      cartItems.innerHTML = "";
+      let total = 0;
+      cart.forEach(index => {
+        total += prices[index];
+        const li = document.createElement("li");
+        li.textContent = `${products[index]} - ${prices[index]} FCFA`;
+        cartItems.appendChild(li);
+      });
+      totalPriceEl.textContent = total;
+      totalPiEl.textContent = (total / 100000000).toFixed(8);
+    }
+
+    function payWithFedaPay() {
+      const amount = parseInt(totalPriceEl.textContent);
+      const name = document.getElementById("clientName").value;
+      const phone = document.getElementById("clientPhone").value;
+
+      if (!name || !phone) {
+        alert("Veuillez remplir vos informations client.");
+        return;
+      }
+
+      const checkout = window.FedaPay.init({
+        public_key: "pk_live_GZ9XidrcooX9ci8v0PE3jPYk",
+        transaction: {
+          amount: amount,
+          description: "Commande Agri Nature Plus",
+          customer: {
+            firstname: name,
+            phone_number: phone,
+          }
+        }
+      });
+      checkout.open();
+    }
+
+    function copyPiAddress() {
+      const address = document.getElementById("piAddress");
+      address.select();
+      document.execCommand("copy");
+      alert("Adresse copiée avec succès !");
+    }
+  </script>
+</body>
+</html>
